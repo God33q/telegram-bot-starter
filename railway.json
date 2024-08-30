@@ -1,11 +1,44 @@
-{
-  "$schema": "https://railway.app/railway.schema.json",
-  "build": {
-    "builder": "NIXPACKS"
-  },
-  "deploy": {
-    "startCommand": "python bot.py",
-    "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10
-  }
-}
+from aiogram import Bot, Dispatcher, types
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
+from aiogram.utils import executor
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+API_TOKEN = '7506456129:AAEkpmkJvuT7MMuozrz5yFgjiEI26t3TnVE'
+
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
+dp.middleware.setup(LoggingMiddleware())
+
+videos = []  # Список для хранения видеофайлов
+
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    keyboard = InlineKeyboardMarkup()
+    next_button = InlineKeyboardButton(text="Next", callback_data="next")
+    keyboard.add(next_button)
+    
+    await message.answer("Welcome! Press Next to watch a video.", reply_markup=keyboard)
+
+@dp.message_handler(commands=['add_video'])
+async def add_video(message: types.Message):
+    # Проверка прав доступа (например, по user_id)
+    if message.from_user.id == 5611827423:
+        video_file = message.video  # Получаем видеофайл
+        if video_file:
+            videos.append(video_file.file_id)  # Сохраняем file_id видео
+            await message.answer("Video added.")
+        else:
+            await message.answer("Please send a video file.")
+    else:
+        await message.answer("Access denied.")
+
+@dp.callback_query_handler(lambda c: c.data == 'next')
+async def send_random_video(callback_query: types.CallbackQuery):
+    if videos:
+        random_video = random.choice(videos)
+        await bot.send_video(callback_query.from_user.id, random_video)
+    else:
+        await bot.send_message(callback_query.from_user.id, "No videos available.")
+
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)
